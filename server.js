@@ -119,7 +119,7 @@ async function generateCSVData() {
 
     const batchSize = 1000;
 
-    for (let batchIndex = 0; batchIndex < 50; batchIndex++) {
+    for (let batchIndex = 0; batchIndex < 10; batchIndex++) {
         const uidsForCSV = [];
         const uidsForCRC = [];
 
