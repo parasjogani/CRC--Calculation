@@ -117,9 +117,9 @@ async function generateCSVData() {
     const hexString = fixedPart.padEnd(296, '0');
     let csvContent = "";
 
-    const batchSize = 1000;
+    const batchSize = 5000;
 
-    for (let batchIndex = 0; batchIndex < 40; batchIndex++) {
+    for (let batchIndex = 0; batchIndex < 10; batchIndex++) {
         const uidsForCSV = [];
 
         // Generate UIDs for the current batch
