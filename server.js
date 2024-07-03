@@ -117,10 +117,14 @@ async function generateCSVData() {
     const hexString = fixedPart.padEnd(296, '0');
     let csvContent = "";
 
-    const batchSize = 5000;
+    const batchSize = 10000;
 
-    for (let batchIndex = 0; batchIndex < 10; batchIndex++) {
+    // Fetch all existing UIDs from the database
+    const existingUIDs = new Set((await UID.find({}, 'uid')).map(doc => doc.uid));
+
+    for (let batchIndex = 0; batchIndex < 5; batchIndex++) {
         const uidsForCSV = [];
+        const uidsForCRC = [];
 
         // Generate UIDs for the current batch
         for (let i = 0; i < batchSize; i++) {
@@ -130,12 +134,16 @@ async function generateCSVData() {
             // Ensure the UID for CSV is unique
             do {
                 uidForCSV = generateRandomUID();
-            } while (await UID.findOne({ uid: uidForCSV }));
+            } while (existingUIDs.has(uidForCSV));
 
             // Ensure the UID for CRC is unique
             do {
                 uidForCRC = generateRandomUID();
-            } while (await UID.findOne({ uid: uidForCRC }));
+            } while (existingUIDs.has(uidForCRC));
+
+            // Add the new UIDs to the set
+            existingUIDs.add(uidForCSV);
+            existingUIDs.add(uidForCRC);
 
             const uidHex = stringToHex(uidForCRC);
             const updatedHexString = insertUIDIntoHex(hexString, uidHex);
@@ -145,11 +153,12 @@ async function generateCSVData() {
             csvContent += `${uidForCSV};${finalUIDHex},${uidForCRC}\n`;
 
             uidsForCSV.push({ uid: uidForCSV });
+            uidsForCRC.push({ uid: uidForCRC });
         }
 
         try {
             // Insert generated UIDs in bulk for the current batch
-            await UID.insertMany(uidsForCSV);
+            await UID.insertMany([...uidsForCSV, ...uidsForCRC]);
         } catch (error) {
             console.error('Error inserting UIDs:', error);
             throw error;
@@ -158,6 +167,7 @@ async function generateCSVData() {
 
     return csvContent;
 }
+
 
 
 // Serve the CSV file route
