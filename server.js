@@ -1,14 +1,41 @@
+// Require dotenv and configure to load environment variables from .env file
+require('dotenv').config();
+
+// Require necessary modules
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
+const mongoose = require('mongoose');
+
+// Create an Express app
 const app = express();
-const port = 4000;
+const port = process.env.PORT;
+
+// MongoDB connection URI and database name
+const uri = process.env.MONGODB_URL;
+
+// Define mongoose schema and model
+const Schema = mongoose.Schema;
+const uidSchema = new Schema({
+    uid: { type: String, required: true, unique: true }
+});
+const UID = mongoose.model('UID', uidSchema);
+
+// Connect to MongoDB using mongoose
+mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
+    .then(() => {
+        console.log('Connected to MongoDB');
+    })
+    .catch(error => {
+        console.error('Error connecting to MongoDB:', error);
+        process.exit(1); // Exit the application if failed to connect
+    });
 
 // Function to generate a random 8-digit alphanumeric UID without lowercase characters
-function generateUID() {
-    var chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    var uid = '';
-    for (var i = 0; i < 8; i++) {
+function generateRandomUID() {
+    const chars = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+    let uid = '';
+    for (let i = 0; i < 8; i++) {
         uid += chars.charAt(Math.floor(Math.random() * chars.length));
     }
     return uid;
@@ -16,8 +43,8 @@ function generateUID() {
 
 // Function to convert string to HEX
 function stringToHex(str) {
-    var hex = '';
-    for (var i = 0; i < str.length; i++) {
+    let hex = '';
+    for (let i = 0; i < str.length; i++) {
         hex += str.charCodeAt(i).toString(16).padStart(2, '0');
     }
     return hex.toUpperCase();
@@ -25,13 +52,13 @@ function stringToHex(str) {
 
 // Function to insert the UID HEX value into the 148-byte HEX string at the specified positions
 function insertUIDIntoHex(hexString, uidHex) {
-    var start = 26 * 2; // Byte 27 (0-based index)
-    var end = 34 * 2;   // Byte 34 (0-based index)
+    const start = 26 * 2; // Byte 27 (0-based index)
+    const end = 34 * 2;   // Byte 34 (0-based index)
     return hexString.substring(0, start) + uidHex + hexString.substring(end);
 }
 
 // CRC16ModbusMaster definition
-var CRC16ModbusMaster = {
+const CRC16ModbusMaster = {
     StringToCheck: "",
     CleanedString: "",
 
@@ -48,11 +75,11 @@ var CRC16ModbusMaster = {
 
     // Calculate CRC16Modbus
     CRC16Modbus: function () {
-        var crc = 0xFFFF;
-        var str = this.CleanedString;
-        for (var pos = 0; pos < str.length; pos++) {
+        let crc = 0xFFFF;
+        const str = this.CleanedString;
+        for (let pos = 0; pos < str.length; pos++) {
             crc ^= str.charCodeAt(pos);
-            for (var i = 8; i !== 0; i--) {
+            for (let i = 8; i !== 0; i--) {
                 if ((crc & 0x0001) !== 0) {
                     crc = (crc >> 1) ^ 0xA001;
                 } else {
@@ -65,9 +92,9 @@ var CRC16ModbusMaster = {
 
     // Utility function to convert hex string to normal string
     _hexStringToString: function (inputstr) {
-        var hex = inputstr.toString();
-        var str = '';
-        for (var i = 0; i < hex.length; i += 2) {
+        const hex = inputstr.toString();
+        let str = '';
+        for (let i = 0; i < hex.length; i += 2) {
             str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
         }
         return str;
@@ -84,38 +111,70 @@ var CRC16ModbusMaster = {
 };
 
 // Generate CSV data
-function generateCSVData() {
-    var fixedPart = "1002200181080000000000000000000000000000000000000000566972414c313233000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
-    var hexString = fixedPart.padEnd(296, '0');
-    var csvContent = "";
+async function generateCSVData() {
+    const fixedPart = "1002200181080000000000000000000000000000000000000000566972414c3132330000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
 
-    for (var i = 0; i < 5000; i++) {
-        var uidForCSV = generateUID();
-        var uidForCRC = generateUID();
-        var uidHex = stringToHex(uidForCRC);
-        var updatedHexString = insertUIDIntoHex(hexString, uidHex);
-        var crcValue = CRC16ModbusMaster.Calculate(updatedHexString);
-        var crcHex = crcValue.toString(16).toUpperCase().padStart(4, '0');
-        var finalUIDHex = uidHex + crcHex;
-        csvContent += uidForCSV + ";" + finalUIDHex + "\n";
+    const hexString = fixedPart.padEnd(296, '0');
+    let csvContent = "";
+
+    const batchSize = 1000;
+
+    for (let batchIndex = 0; batchIndex < 50; batchIndex++) {
+        const uidsForCSV = [];
+        const uidsForCRC = [];
+
+        // Generate UIDs for the current batch
+        for (let i = 0; i < batchSize; i++) {
+            const uidForCSV = generateRandomUID();
+            const uidForCRC = generateRandomUID();
+            const uidHex = stringToHex(uidForCRC);
+            const updatedHexString = insertUIDIntoHex(hexString, uidHex);
+            const crcValue = CRC16ModbusMaster.Calculate(updatedHexString);
+            const crcHex = crcValue.toString(16).toUpperCase().padStart(4, '0');
+            const finalUIDHex = uidHex + crcHex;
+            csvContent += `${uidForCSV};${finalUIDHex},${uidForCRC}\n`;
+
+            uidsForCSV.push({ uid: uidForCSV });
+            uidsForCRC.push({ uid: uidForCRC });
+        }
+
+        try {
+            // Insert generated UIDs in bulk for the current batch
+            await UID.insertMany([...uidsForCSV, ...uidsForCRC]);
+        } catch (error) {
+            console.error('Error inserting UIDs:', error);
+            throw error;
+        }
     }
 
     return csvContent;
 }
 
-// Serve the CSV file
-app.get('/download', (req, res) => {
-    const csvData = generateCSVData();
-    const filePath = path.join(__dirname, 'uid_crc_data.csv');
-    fs.writeFileSync(filePath, csvData);
-    res.download(filePath, 'uid_crc_data.csv', (err) => {
-        if (err) {
-            console.error(err);
-        }
-        fs.unlinkSync(filePath);
-    });
+// Serve the CSV file route
+app.get('/download', async (req, res) => {
+    try {
+        const csvData = await generateCSVData();
+        const filePath = path.join(__dirname, 'uid_crc_data.csv');
+        fs.writeFileSync(filePath, csvData);
+
+        res.download(filePath, 'uid_crc_data.csv', (err) => {
+            if (err) {
+                console.error("Error during file download:", err);
+            }
+            // Delete the CSV file after download
+            fs.unlink(filePath, (err) => {
+                if (err) {
+                    console.error("Error deleting CSV file:", err);
+                }
+            });
+        });
+    } catch (error) {
+        console.error('Error generating CSV data:', error);
+        res.status(500).send('Error generating CSV file');
+    }
 });
 
+// Start the server
 app.listen(port, () => {
     console.log(`Server is running at http://localhost:${port}`);
 });
