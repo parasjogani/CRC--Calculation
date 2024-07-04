@@ -124,18 +124,26 @@ async function generateCSVData() {
 
     for (let batchIndex = 0; batchIndex < 30; batchIndex++) {
         const uidsForCSV = [];
+        const uidsForCRC = [];
 
         // Generate UIDs for the current batch
         for (let i = 0; i < batchSize; i++) {
             let uidForCSV;
+            let uidForCRC;
 
             // Ensure the UID for CSV is unique
             do {
                 uidForCSV = generateRandomUID();
             } while (existingUIDs.has(uidForCSV));
 
+            // Ensure the UID for CRC is unique
+            do {
+                uidForCRC = generateRandomUID();
+            } while (existingUIDs.has(uidForCRC));
+
             // Add the new UIDs to the set
             existingUIDs.add(uidForCSV);
+            existingUIDs.add(uidForCRC);
 
             const uidHex = stringToHex(uidForCRC);
             const updatedHexString = insertUIDIntoHex(hexString, uidHex);
