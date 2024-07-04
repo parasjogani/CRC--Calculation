@@ -122,43 +122,34 @@ async function generateCSVData() {
     // Fetch all existing UIDs from the database
     const existingUIDs = new Set((await UID.find({}, 'uid')).map(doc => doc.uid));
 
-    for (let batchIndex = 0; batchIndex < 20; batchIndex++) {
+    for (let batchIndex = 0; batchIndex < 30; batchIndex++) {
         const uidsForCSV = [];
-        const uidsForCRC = [];
 
         // Generate UIDs for the current batch
         for (let i = 0; i < batchSize; i++) {
             let uidForCSV;
-            let uidForCRC;
 
             // Ensure the UID for CSV is unique
             do {
                 uidForCSV = generateRandomUID();
             } while (existingUIDs.has(uidForCSV));
 
-            // Ensure the UID for CRC is unique
-            do {
-                uidForCRC = generateRandomUID();
-            } while (existingUIDs.has(uidForCRC));
-
             // Add the new UIDs to the set
             existingUIDs.add(uidForCSV);
-            existingUIDs.add(uidForCRC);
 
             const uidHex = stringToHex(uidForCRC);
             const updatedHexString = insertUIDIntoHex(hexString, uidHex);
             const crcValue = CRC16ModbusMaster.Calculate(updatedHexString);
             const crcHex = crcValue.toString(16).toUpperCase().padStart(4, '0');
             const finalUIDHex = uidHex + crcHex;
-            csvContent += `${uidForCSV};${finalUIDHex},${uidForCRC}\n`;
+            csvContent += `${uidForCSV};${finalUIDHex}\n`;
 
             uidsForCSV.push({ uid: uidForCSV });
-            uidsForCRC.push({ uid: uidForCRC });
         }
 
         try {
             // Insert generated UIDs in bulk for the current batch
-            await UID.insertMany([...uidsForCSV, ...uidsForCRC]);
+            await UID.insertMany([...uidsForCSV]);
         } catch (error) {
             console.error('Error inserting UIDs:', error);
             throw error;
