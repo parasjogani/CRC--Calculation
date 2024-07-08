@@ -122,7 +122,7 @@ async function generateCSVData() {
     // Fetch all existing UIDs from the database
     const existingUIDs = new Set((await UID.find({}, 'uid')).map(doc => doc.uid));
 
-    for (let batchIndex = 0; batchIndex < 5; batchIndex++) {
+    for (let batchIndex = 0; batchIndex < 15; batchIndex++) {
         const uidsForCSV = [];
         const uidsForCRC = [];
 
