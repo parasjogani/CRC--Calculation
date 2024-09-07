@@ -10,6 +10,7 @@ const mongoose = require('mongoose');
 // Create an Express app
 const app = express();
 const port = process.env.PORT;
+const authToken = process.env.AUTH_TOKEN;
 
 // MongoDB connection URI and database name
 const uri = process.env.MONGODB_URL;
@@ -30,6 +31,17 @@ mongoose.connect(uri, { useNewUrlParser: true, useUnifiedTopology: true })
         console.error('Error connecting to MongoDB:', error);
         process.exit(1); // Exit the application if failed to connect
     });
+
+// Middleware for token-based authentication
+function authenticateToken(req, res, next) {
+    const token = req.headers['authorization'];
+
+    if (token === authToken) {
+        next(); // Proceed to the next middleware or route handler
+    } else {
+        res.status(403).send('Forbidden: Invalid token');
+    }
+}
 
 // Function to generate a random 8-digit alphanumeric UID without lowercase characters
 function generateRandomUID() {
@@ -170,7 +182,7 @@ async function generateCSVData() {
 
 
 // Serve the CSV file route
-app.get('/download', async (req, res) => {
+app.get('/download', authenticateToken, async (req, res) => {
     try {
         const csvData = await generateCSVData();
         const filePath = path.join(__dirname, 'uid_crc_data.csv');
